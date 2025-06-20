@@ -1,0 +1,566 @@
+---
+title: "Description&Regression"
+author: "王新舒 王映泽"
+date: "2025-06-08"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 加载库和数据
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+library(readxl)
+
+data <- read_excel("二手汽车信息.xlsx", sheet = "原始数据")
+```
+
+## 数据预处理
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+data$保值率 <- data$价格/data$新车含税价
+
+data$上牌时间 <- as.Date(data$上牌时间, format = "%Y-%m-%d")
+data$发布时间 <- as.Date(data$发布时间, format = "%Y-%m-%d")
+data$年检到期 <- as.Date(data$年检到期, format = "%Y-%m-%d")
+data$保险到期 <- as.Date(data$保险到期, format = "%Y-%m-%d")
+
+data$车龄 <- as.numeric(difftime(Sys.Date(), data$上牌时间, units = "days")) / 365
+
+data$品牌 <- as.factor(data$品牌)
+data$城市地区 <- as.factor(data$城市地区)
+data$城市发展水平 <- as.factor(data$城市发展水平)
+data$燃料类型 <- as.factor(data$燃料类型)
+data$车辆级别 <- as.factor(data$车辆级别)
+data$车身颜色 <- as.factor(data$车身颜色)
+data$驱动方式 <- as.factor(data$驱动方式)
+data$预测 <- as.factor(data$预测)
+data$cluster <- as.factor(data$cluster)
+```
+
+## 数据描述
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+summary(data)
+str(data)
+```
+
+## 数据可视化
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+windowsFonts(songti=windowsFont("黑体"))
+```
+
+### 1. 保值率分布图
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE, warning=FALSE}
+summary(data$保值率)
+
+library(ggplot2)
+# 绘制保值率分布图
+ggplot(data, aes(x = 保值率)) +
+  geom_histogram(bins = 30, fill = "#d89c7a", color = "white") +
+  geom_vline(aes(xintercept = median(保值率)), color = "red", linetype = "dashed") +
+  annotate("text", x = median(data$保值率), y = 1500, label = paste("中位数:", round(median(data$保值率), 2)), color = "red") +
+  labs(x = "保值率", y = "频数") +
+  theme_minimal()+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 2. 品牌与保值率关系图
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+
+# 将“其他”品牌放在最后
+data$品牌 <- as.factor(data$品牌)
+current_levels <- levels(data$品牌)
+other_levels <- current_levels[!current_levels == "其他"]
+new_levels <- c(other_levels, "其他")
+data$品牌 <- factor(data$品牌, levels = new_levels)
+colors <- rep(c("#d89c7a", "#d6c38b", "#cfc3a9", "#849b91", "#686789", "#b77f70"), length.out = length(levels(data$品牌)))
+
+ggplot(data, aes(x = 品牌, y = 保值率, fill = 品牌)) +
+  geom_boxplot() +
+  labs(x = "品牌", y = "保值率") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_fill_manual(values = colors)+
+  theme(legend.text=element_text(family="songti"))
+      
+```
+
+## 3. 车龄与保值率的关系
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+
+ggplot(data, aes(x = 车龄, y = 保值率)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "loess", color = "red") +
+  labs(x = "车龄(年)", y = "保值率") +
+  theme_minimal()+
+  theme(legend.text=element_text(family="songti"))
+
+```
+
+## 4. 城市发展水平与保值率的关系
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+
+# 将城市发展水平的因子水平重新排序
+data$城市发展水平 <- factor(data$城市发展水平, levels = c("一线", "二线", "三线", "其他"))
+colors <- rep(c("#d89c7a", "#d6c38b", "#cfc3a9", "#849b91", "#686789", "#b77f70"), length.out = length(levels(data$城市发展水平)))
+
+ggplot(data, aes(x = 城市发展水平, y = 保值率, fill = 城市发展水平)) +
+  geom_boxplot() +
+  labs(x = "城市发展水平", y = "保值率") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_fill_manual(values = colors)+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 5. 车辆级别与保值率的关系
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+
+colors <- rep(c("#d89c7a", "#d6c38b", "#cfc3a9", "#849b91", "#686789", "#b77f70"), length.out = length(levels(data$车辆级别)))
+
+ggplot(data, aes(x = 车辆级别, y = 保值率, fill = 车辆级别)) +
+  geom_boxplot() +
+  labs(x = "车辆级别", y = "保值率") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_fill_manual(values = colors)+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 6. 驱动方式与保值率的关系
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+
+colors <- rep(c("#d89c7a", "#d6c38b", "#cfc3a9", "#849b91", "#686789", "#b77f70"), length.out = length(levels(data$驱动方式)))
+
+ggplot(data, aes(x = 驱动方式, y = 保值率, fill = 驱动方式)) +
+  geom_boxplot() +
+  labs(x = "驱动方式", y = "保值率") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_fill_manual(values = colors)+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 7. 续航里程与保值率的关系
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+              
+ggplot(data, aes(x = 纯电续航里程, y = 保值率)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "loess", color = "red") +
+  labs(x = "纯电续航里程(km)", y = "保值率") +
+  theme_minimal()+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 8. 车身颜色与保值率的关系
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+library(dplyr)
+library(stringr)
+
+data <- data %>%
+  mutate(颜色大类 = case_when(
+    str_detect(车身颜色, "银|灰") ~ "银/灰色系",
+    str_detect(车身颜色, "白") ~ "白色系",
+    str_detect(车身颜色, "黑") ~ "黑色系",
+    str_detect(车身颜色, "蓝") ~ "蓝色系",
+    str_detect(车身颜色, "红|紫") ~ "红/紫色系",
+    TRUE ~ "其他"
+  ))
+
+colors <-c("#d89c7a", "#d6c38b", "#cfc3a9", "#849b91", "#686789", "#b77f70")
+
+ggplot(data, aes(x = 颜色大类, y = 保值率, fill = 颜色大类)) +
+  geom_boxplot() +
+  labs(x = "车身颜色", y = "保值率") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_fill_manual(values = colors)+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 9. 地理分布热力图
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(sf)
+library(tidyverse)
+library(viridis)
+
+province_mapping <- tribble(
+  ~省份, ~大区,
+  "上海市", "华东",
+  "江苏省", "华东",
+  "浙江省", "华东",
+  "安徽省", "华东",
+  "福建省", "华东",
+  "江西省", "华东",
+  "山东省", "华东",
+  "广东省", "华南",
+  "广西壮族自治区", "华南",
+  "海南省", "华南",
+  "北京市", "华北",
+  "天津市", "华北",
+  "河北省", "华北",
+  "山西省", "华北",
+  "内蒙古自治区", "华北",
+  "河南省", "华中",
+  "湖北省", "华中",
+  "湖南省", "华中",
+  "重庆市", "西南",
+  "四川省", "西南",
+  "贵州省", "西南",
+  "云南省", "西南",
+  "西藏自治区", "西南",
+  "陕西省", "西北",
+  "甘肃省", "西北",
+  "青海省", "西北",
+  "宁夏回族自治区", "西北",
+  "新疆维吾尔自治区", "西北",
+  "辽宁省", "东北",
+  "吉林省", "东北",
+  "黑龙江省", "东北"
+)
+
+china_province <- st_read("省.shp") %>%  
+  select(省, geometry) %>%  
+  left_join(province_mapping, by = c("省" = "省份"))
+
+region_data <- data %>%
+  group_by(城市地区) %>%
+  summarise(平均保值率 = mean(保值率, na.rm = TRUE)) %>%
+  rename(大区 = 城市地区)
+
+map_data <- china_province %>%
+  group_by(大区) %>%
+  summarise(geometry = st_union(geometry)) %>%  
+  left_join(region_data, by = "大区")
+
+custom_palette <- c("#2E91A5", "#45B7D1", "#8FD3F4", "#D5EFFA", 
+                    "#F0F921", "#FDC926", "#F68F46", "#E16462", 
+                    "#B12A90", "#6A00A8")
+
+ggplot(map_data) +
+  geom_sf(aes(fill = 平均保值率), 
+          color = "gray40",
+          size = 0.35,
+          alpha = 0.9) +
+  geom_sf_text(aes(label = 大区), 
+               color = "black",
+               fontface = "bold",
+               size = 3.8,
+               check_overlap = TRUE) +
+  scale_fill_gradientn(
+    name = "保值率",
+    colours = custom_palette,
+    limits = c(floor(min(map_data$平均保值率)*10)/10, 
+              ceiling(max(map_data$平均保值率)*10)/10),
+    breaks = scales::pretty_breaks(n = 5),
+    labels = scales::percent_format(accuracy = 1),
+    guide = guide_colorbar(
+      direction = "vertical",    # 改为竖直方向
+      barwidth = unit(0.8, "cm"), # 调整尺寸比例
+      barheight = unit(4, "cm"),
+      title.position = "top",
+      title.hjust = 0.5,
+      frame.colour = NA,
+      ticks.colour = NA,
+      ticks.linewidth = 0.8,      # 加粗刻度线
+      label.theme = element_text(angle = 0, hjust = 0.5) # 标签水平居中
+    )
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),
+    legend.position = "right",                # 右侧布局
+    legend.title = element_text(size = 10, face = "bold", 
+                               margin = margin(b = 5)),
+    legend.text = element_text(size = 8),
+    legend.justification = c(0.5, 0.5),            # 顶部对齐
+    panel.background = element_rect(fill = "transparent"),
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    legend.background = element_rect(fill = "transparent"),
+    legend.box.background = element_rect(fill = "transparent", 
+                                        colour = "transparent"),
+    legend.margin = margin(l = 5, r = 5),     # 增加两侧边距
+    panel.border = element_blank(),        # 移除面板边框
+    plot.margin = margin(0, 0, 0, 0)       # 移除绘图区域外边距
+  )+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 10. 预测与保值率的箱线图
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+
+library(ggplot2)
+
+colors <- c("#d89c7a", "#d6c38b")
+
+ggplot(data, aes(x = 预测, y = 保值率, fill = 预测)) +
+  geom_boxplot() +
+  labs(x = "预测", y = "保值率") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_fill_manual(values = colors)+
+  theme(legend.text=element_text(family="songti"))
+```
+
+## 11. 每一类别的雷达图(运行后会生成多个PNG文件，每个类别保存一次，不在markdown中显示)
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+
+library(dplyr)
+library(fmsb)
+library(RColorBrewer)
+library(readxl)
+
+# 1. 读取数据
+df <- read_excel("Data.xlsx", sheet = "description")
+df$cluster <- as.factor(data$cluster)
+
+factor_cols <- c("动力性能因子", "新能源属性因子", "时效因子", "充电效率因子")
+df_factors <- df %>% select(cluster, all_of(factor_cols))
+
+# 按聚类分组计算均值
+df_means <- df_factors %>%
+  group_by(cluster) %>%
+  summarise(across(all_of(factor_cols), mean))
+
+# 生成颜色方案
+clusters <- unique(df_means$cluster)
+n_clusters <- length(clusters)
+colors <- brewer.pal(n_clusters, "Set2")
+
+# 定义雷达图绘制函数
+draw_radar <- function(cluster_name, color) {
+  data <- df_means %>% 
+    filter(cluster == cluster_name) %>% 
+    select(-cluster) %>%
+    as.data.frame()
+  
+  # 设置坐标轴范围（根据实际数据调整）
+  max_min <- data.frame(
+    动力性能因子 = c(2, -2),
+    新能源属性因子 = c(2, -2),
+    时效因子 = c(4, -2),
+    充电效率因子 = c(2, -2)
+  )
+  data <- rbind(max_min, data)
+  
+  # 绘制雷达图
+  radarchart(
+    data,
+    title = paste("类别:", cluster_name),
+    pcol = color,
+    pfcol = adjustcolor(color, alpha.f = 0.3),
+    plwd = 2,
+    cglcol = "grey",
+    cglty = 1,
+    axislabcol = "grey",
+    vlcex = 0.8
+  )
+}
+
+# 为每个类别单独保存图片
+for (i in 1:n_clusters) {
+  # 创建安全的文件名（替换特殊字符）
+  safe_name <- make.names(clusters[i])
+  
+  # 启动PNG设备（可改为pdf等其他格式）
+  png(paste0("radar_", safe_name, ".png"),
+      width = 800, 
+      height = 600,
+      res = 100)
+  
+  # 设置绘图参数
+  par(mar = c(2, 2, 3, 2))
+  
+  # 绘制图形
+  draw_radar(clusters[i], colors[i])
+  
+  # 关闭图形设备
+  dev.off()
+}
+
+# 可选：添加图例文件
+png("radar_legend.png", width = 400, height = 300)
+plot.new()
+legend("center",
+       legend = clusters,
+       pch = 15,
+       col = colors,
+       title = "类别说明",
+       cex = 1.2)
+dev.off()
+
+```
+
+## 12. 驱动方式与保值率的箱线图
+
+```{r echo=TRUE, message=FALSE, paged.print=TRUE}
+library(ggplot2)
+library(readxl)
+
+# 读取数据
+data$驱动 <- as.factor(data$驱动)
+data$保值率 <- data$价格 / data$新车含税价
+
+# 设置颜色
+colors <- c("#d89c7a", "#d6c38b", "#cfc3a9", "#849b91", "#686789", "#b77f70")
+# 绘制箱线图
+ggplot(data, aes(x = 驱动, y = 保值率, fill = 驱动)) +
+  geom_boxplot() +
+  labs(x = "驱动方式", y = "保值率") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal()+
+  theme(legend.position = "none")+
+  scale_fill_manual(values = colors)+
+  theme(legend.text=element_text(family="songti"))
+
+```
+
+## 13. 密度图
+
+```{r}
+#读入文件
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(corrplot)
+
+data <- read_excel("Data.xlsx", sheet = "regression")
+names(data) <- gsub("（.*?）", "", names(data))  # 去掉全角括号及内容
+names(data) <- gsub("\\(.*?\\)", "", names(data))  # 万一有半角括号也顺便去掉
+
+data<-data[,-c(1,4,5,7,9,13,14,15)]
+
+ggplot(data, aes(x = data$保值率)) +
+  geom_density(fill = "lightblue", alpha = 0.6) +
+  labs(title = "二手车保值率密度图",
+       x = "保值率", y = "密度") +
+  theme_minimal()
+```
+
+```{r}
+data0<-data[,c(1,3,4,8,12,13,14,16,17,18,19,20)]
+data0<-cor(data0, use = "complete.obs")
+```
+
+## 14. 热力图
+
+```{r}
+plot(1:10, type = "l")
+print(strwidth("W", cex = 2))
+corrplot(corr = data0, method = "color", type = "upper", tl.pos = "lt", insig = "pch",
+    rect.col = 'black', tl.col = 'black', tl.cex = 0.8, number.cex = 0.8) 
+corrplot(corr = data0, type = "lower", method = "number", add = TRUE, tl.pos = "n", cl.pos = "n", diag = FALSE,
+    rect.col = 'black', tl.col = 'black', tl.cex = 0.8, number.cex = 0.7)
+```
+
+# 总回归
+
+```{r}
+vars_numeric <- c("表显里程", "排量", "过户次数","标准容量", "标准快充", "标准慢充",
+                  "纯电续航里程", "发动机马力",
+                  "发布时距保险到期时间", "发布时距年检到期时间", "发布时距上牌时间")
+
+vars_factor <- c("城市地区", "城市发展水平", "燃料类型", 
+                 "车辆级别", "车身颜色", "驱动方式", "续航方式","预测","cluster")
+
+# 标准化数值变量
+data_scaled <- data
+data_scaled[vars_numeric] <- scale(data_scaled[vars_numeric])
+
+library(MASS)
+library(splines)  # 加载样条包
+
+# 创建公式：对“纯电续航里程”使用自然样条函数 ns()
+full_formula <- as.formula(
+  paste("保值率 ~ ns(`纯电续航里程`, df = 2) +", 
+        paste(setdiff(c(vars_numeric, vars_factor), "纯电续航里程"), collapse = " + "))
+)
+
+# 拟合模型
+full_model <- lm(full_formula, data = data_scaled)
+
+# 基于 BIC 的逐步回归
+n <- nrow(data_scaled)  # 样本数
+bic_model <- step(full_model, direction = "both", k = log(n), trace = FALSE)
+# 查看结果
+summary(bic_model)
+
+```
+
+## 模型检验
+
+```{r}
+library(lmtest)
+library(car)
+# 异方差检验
+bptest(bic_model)
+# 自相关检验
+dwtest(bic_model)
+# 多重共线性检验 - VIF
+vif(bic_model)
+mean(vif(bic_model))
+```
+
+## 最终回归模型
+
+```{r}
+library(sandwich)
+library(lmtest)
+
+# 剔除排量和驱动方式
+vars_numeric_reduced <- setdiff(vars_numeric, c("排量"))
+vars_factor_reduced <- setdiff(vars_factor, c("燃料类型"))
+vars_factor_reduced <- setdiff(vars_factor_reduced, c("cluster"))
+# 重建公式
+reduced_formula <- as.formula(
+  paste("保值率 ~ ns(`纯电续航里程`, df = 2) +", 
+        paste(setdiff(c(vars_numeric_reduced, vars_factor_reduced), "纯电续航里程"), collapse = " + "))
+)
+
+# 新建模型
+reduced_model <- lm(reduced_formula, data = data_scaled)
+
+# 再次进行逐步回归
+bic_model_reduced <- step(reduced_model, direction = "both", k = log(n), trace = FALSE)
+
+summary(bic_model_reduced)
+
+# 使用 Newey-West 方法进行稳健估计（lag = 1）
+coeftest(bic_model_reduced, vcov = NeweyWest(bic_model_reduced, lag = 1, prewhite = FALSE))
+
+# 再次查看VIF
+vif(bic_model_reduced)
+
+```
